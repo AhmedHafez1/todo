@@ -16,10 +16,10 @@ datasource db {
 model Todo {
   id          Int    @id @default(autoincrement())
   description String
-  status      Status @default(ACTIVE)
+  status      Status @default(PENDING)
 }
 
 enum Status {
-  ACTIVE
+  PENDING
   COMPLETED
 }

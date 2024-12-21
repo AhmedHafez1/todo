@@ -2,15 +2,21 @@ version: '3.4'
 
 services:
   todo:
+    container_name: app
     image: todo
     build:
       context: .
       dockerfile: ./Dockerfile
     environment:
       NODE_ENV: production
+    env_file:
+      - .env
     ports:
       - 3000:3000
+    depends_on:
+      - postgres
   postgres:
+    container_name: postgres
     image: postgres
     environment:
       POSTGRES_USER: todo

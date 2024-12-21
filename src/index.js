@@ -1,7 +1,9 @@
 const express = require('express');
 const { body, param } = require('express-validator');
-const todos = require('./todos.js');
 const validator = require('./middlewares/validator');
+const { PrismaClient } = require('@prisma/client');
+
+const prisma = new PrismaClient();
 
 const app = express();
 
@@ -10,15 +12,19 @@ app.use(express.json());
 
 // Routes
 app.get('/', (req, res) => {
-  res.send('Hello, World!');
+  res.send('Server is running!');
 });
 
-app.get('/todos', (req, res) => {
+app.get('/todos', async (req, res) => {
+  const todos = await prisma.todo.findMany();
   res.json(todos);
 });
 
-app.get('/todos/:id', [param('id').isInt()], validator, (req, res) => {
-  const todo = todos.find((todo) => todo.id === parseInt(req.params.id));
+app.get('/todos/:id', [param('id').isInt()], validator, async (req, res) => {
+  const todo = await prisma.todo.findUnique({
+    where: { id: parseInt(req.params.id) },
+  });
+
   if (!todo) {
     res.status(404).send('Todo not found');
   } else {
@@ -40,11 +46,10 @@ app.post(
       .withMessage('Status must be "pending" or "completed"'),
   ],
   validator,
-  (req, res) => {
-    const todo = req.body;
-    todo.id = todos.length + 1;
-    todo.status = todo.status || 'pending';
-    todos.push(todo);
+  async (req, res) => {
+    const { description, status } = req.body;
+    const todo = await prisma.todo.create({ data: { description, status } });
+
     res.status(201).json(todo);
   }
 );
@@ -54,34 +59,44 @@ app.put(
   [
     param('id').isInt().withMessage('ID must be an integer'),
     body('description')
-      .optional()
       .isString()
-      .withMessage('Description must be a string'),
+      .withMessage('Description must be a string')
+      .notEmpty()
+      .withMessage('Description is required'),
     body('status')
       .isIn(['pending', 'completed'])
-      .withMessage('Status must be "pending" or "completed"'),
+      .withMessage('Status must be "pending" or "completed"')
+      .notEmpty()
+      .withMessage('Status is required'),
   ],
   validator,
-  (req, res) => {
-    const todo = todos.find((todo) => todo.id === parseInt(req.params.id));
+  async (req, res) => {
+    const todo = await prisma.todo.findUnique({
+      where: { id: parseInt(req.params.id) },
+    });
     if (!todo) {
-      res.status(404).send('Todo not found');
-    } else {
-      todo.description = req.body.description ?? todo.description;
-      todo.status = req.body.status ?? todo.status;
-      res.json(todo);
+      return res.status(404).send('Todo not found');
     }
+    const updatedTodo = await prisma.todo.update({
+      where: { id: parseInt(req.params.id) },
+      data: {
+        description: req.body.description || todo.description,
+        status: req.body.status || todo.status,
+      },
+    });
+    res.json(updatedTodo);
   }
 );
 
-app.delete('/todos/:id', (req, res) => {
-  const todo = todos.find((todo) => todo.id === parseInt(req.params.id));
+app.delete('/todos/:id', async (req, res) => {
+  const todo = await prisma.todo.findUnique({
+    where: { id: parseInt(req.params.id) },
+  });
   if (!todo) {
-    res.status(404).send('Todo not found');
-  } else {
-    todos.splice(todos.indexOf(todo), 1);
-    res.status(204).send();
+    return res.status(404).send('Todo not found');
   }
+  await prisma.todo.delete({ where: { id: parseInt(req.params.id) } });
+  res.status(204).send();
 });
 
 app.listen(3000, () => {
