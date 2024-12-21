@@ -1,6 +1,6 @@
 const express = require('express');
 const { body, param } = require('express-validator');
-const todos = require('./todos');
+const todos = require('./todos.js');
 const validator = require('./middlewares/validator');
 
 const app = express();
